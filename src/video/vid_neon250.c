@@ -78,12 +78,13 @@ typedef struct neon250_t {
     /* PCI-specific */
     uint8_t      pci_regs[256];
     uint8_t      int_line;
+    uint8_t      pci_slot;
     int          card;
     
 } neon250_t;
 
 static video_timings_t timing_neon250 = {
-    .type      = VIDEO_PCI,
+    .type      = VIDEO_AGP,
     .write_b   = 2,
     .write_w   = 2,
     .write_l   = 4,
@@ -279,7 +280,7 @@ static uint8_t neon250_in(uint16_t addr, void *priv)
 
 static void neon250_recalctimings(svga_t *svga)
 {
-    neon250_t *neon250 = (neon250_t *)container_of(svga, neon250_t, svga);
+    neon250_t *neon250 = (neon250_t *)svga->priv;
     
     /* Calculate timing parameters based on CRTC registers */
     svga->hdisp = svga->crtc[1] - ((svga->crtc[5] & 0x60) >> 5);
@@ -341,7 +342,7 @@ static void neon250_pci_write(int func, int addr, uint8_t val, void *priv)
         
     if (addr >= 0 && addr < 256) {
         switch (addr) {
-            case PCI_COMMAND:
+            case PCI_REG_COMMAND:
                 neon250->pci_regs[PCI_REG_COMMAND] = val & 0x37; /* Only bits 0-2 of the command register are writable */
                 
                 /* Update memory mapping based on PCI command register */
