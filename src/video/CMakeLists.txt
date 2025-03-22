@@ -73,6 +73,9 @@ add_library(vid OBJECT
     vid_ogc.c
     vid_mga.c
     vid_nga.c
+    vid_neon250.c
+    vid_neon250_3d.c
+    vid_neon250_reg.c
     vid_tvp3026_ramdac.c
     vid_att2xc498_ramdac.c
     vid_xga.c
