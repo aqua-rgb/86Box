@@ -1122,6 +1122,7 @@ static void pvr_3d_timer_callback(void* priv) {
     
     /* Update registers to reflect render completion */
     pvr_reg_render_complete(state);
+
     
     /* Set render complete status */
     state->render_status |= 1;
