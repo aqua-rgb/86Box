@@ -368,7 +368,7 @@ static void neon250_pci_write(int func, int addr, uint8_t val, void *priv)
                                (neon250->pci_regs[0x11] << 8) | 
                                (neon250->pci_regs[0x10] & 0xf0);
                                
-                if (neon250->pci_regs[PCI_COMMAND] & PCI_COMMAND_MEM) {
+                if (neon250->pci_regs[PCI_REG_COMMAND] & PCI_COMMAND_MEM) {
                     mem_mapping_set_addr(&neon250->svga.mapping, base, 64 << 20);
                 }
                 break;
@@ -390,7 +390,7 @@ static void neon250_pci_write(int func, int addr, uint8_t val, void *priv)
                                     (neon250->pci_regs[0x15] << 8) | 
                                     (neon250->pci_regs[0x14] & 0xf0);
                 
-                if (neon250->pci_regs[PCI_COMMAND] & PCI_COMMAND_MEM) {
+                if (neon250->pci_regs[PCI_REG_COMMAND] & PCI_COMMAND_MEM) {
                     mem_mapping_set_addr(&neon250->mmio_mapping, mmio_base, 0x10000);
                 }
                 break;
@@ -453,7 +453,7 @@ static void *neon250_init(const device_t *info)
     neon250->is_lowres = 0;
     
     /* Set up PCI */
-    neon250->card = pci_add_card(PCI_ADD_AGP, neon250_pci_read, neon250_pci_write, neon250, &neon250->pci_slot);
+    pci_add_card(PCI_ADD_AGP, neon250_pci_read, neon250_pci_write, neon250, &neon250->pci_slot);
     
     /* Configure PCI registers */
     neon250->pci_regs[0x00] = PCI_VENDOR_NEC & 0xff;
