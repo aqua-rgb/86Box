@@ -318,117 +318,6 @@ static void neon250_recalctimings(svga_t *svga)
     }
 }
 
-static void *neon250_init(const device_t *info)
-{
-    neon250_t *neon250 = calloc(1, sizeof(neon250_t));
-    
-    neon250->memory_size = device_get_config_int("memory") << 20;
-    
-    /* Set up SVGA */
-    svga_init(info, &neon250->svga, neon250, neon250->memory_size,
-              neon250_recalctimings, neon250_in, neon250_out, NULL, NULL);
-    
-    /* Map the MMIO registers at 0xA05F8000 */
-    mem_mapping_add(&neon250->mmio_mapping, 0xA05F8000, 0x10000,
-                    neon250_mmio_read, neon250_mmio_read_w, neon250_mmio_read_l,
-                    neon250_mmio_write, neon250_mmio_write_w, neon250_mmio_write_l,
-                    NULL, MEM_MAPPING_EXTERNAL, neon250);
-    
-    /* Set up the framebuffer */
-    mem_mapping_set_handler(&neon250->svga.mapping,
-                           svga_read, svga_readw, svga_readl,
-                           svga_write, svga_writew, svga_writel);
-    mem_mapping_set_p(&neon250->svga.mapping, neon250);
-    
-    /* Load the BIOS ROM */
-    rom_init(&neon250->bios_rom, BIOS_ROM_PATH, 0xc0000, 0x20000, 0xffff, 0, MEM_MAPPING_EXTERNAL);
-    
-    /* Set up default display mode */
-    neon250->svga.bpp = 16;
-    neon250->is_interlaced = 0;
-    neon250->is_lowres = 0;
-    
-    /* Set up PCI */
-    neon250->card = pci_add_card(PCI_ADD_AGP, neon250_pci_read, neon250_pci_write, neon250, &neon250->pci_slot);
-    
-    /* Configure PCI registers */
-    neon250->pci_regs[PCI_VENDOR_ID] = PCI_VENDOR_NEC & 0xff;
-    neon250->pci_regs[PCI_VENDOR_ID + 1] = (PCI_VENDOR_NEC >> 8) & 0xff;
-    neon250->pci_regs[PCI_DEVICE_ID] = PCI_DEVICE_NEON250 & 0xff;
-    neon250->pci_regs[PCI_DEVICE_ID + 1] = (PCI_DEVICE_NEON250 >> 8) & 0xff;
-    
-    neon250->pci_regs[PCI_COMMAND] = 0x03; /* I/O and memory accesses enabled */
-    neon250->pci_regs[0x04] = 0x37;
-    neon250->pci_regs[0x05] = 0x00;
-    
-    neon250->pci_regs[0x06] = 0x90;
-    neon250->pci_regs[0x07] = 0x02;
-    
-    neon250->pci_regs[0x08] = 0x02; /* Revision ID */
-    neon250->pci_regs[0x09] = 0x00; /* Programming interface */
-    
-    neon250->pci_regs[0x0a] = 0x00; /* Subclass - VGA compatible controller */
-    neon250->pci_regs[0x0b] = 0x03; /* Class code - Display controller */
-    
-    neon250->pci_regs[0x0c] = 0x00; /* Cache line size */
-    neon250->pci_regs[0x0d] = 0x20; /* Latency timer - 32 clocks */
-    neon250->pci_regs[0x0e] = 0x00; /* Header type - normal */
-    neon250->pci_regs[0x0f] = 0x00; /* BIST */
-    
-    /* PowerVR uses memory-mapped BARs */
-    neon250->pci_regs[0x10] = 0x08; /* BAR 0 - 64MB aperture for framebuffer, memory mapped */
-    neon250->pci_regs[0x11] = 0x00;
-    neon250->pci_regs[0x12] = 0x00;
-    neon250->pci_regs[0x13] = 0xa0;
-    
-    neon250->pci_regs[0x14] = 0x00; /* BAR 1 - 16KB MMIO registers */
-    neon250->pci_regs[0x15] = 0x80;
-    neon250->pci_regs[0x16] = 0x5f;
-    neon250->pci_regs[0x17] = 0xa0;
-    
-    neon250->pci_regs[0x2c] = 0x00; /* Subsystem vendor ID */
-    neon250->pci_regs[0x2d] = 0x10;
-    neon250->pci_regs[0x2e] = 0x20; /* Subsystem ID */
-    neon250->pci_regs[0x2f] = 0x01;
-    
-    neon250->pci_regs[0x30] = (neon250->pci_regs[0x30] & 0x01);; /* Expansion ROM base address */
-    neon250->pci_regs[0x31] = 0x00;
-    neon250->pci_regs[0x32] = neon250->pci_regs[0x32];
-    neon250->pci_regs[0x33] = neon250->pci_regs[0x33];
-
-    neon250->pci_regs[0x34] = 0x60;
-    
-    neon250->pci_regs[0x3c] = 0x01; /* Interrupt line - IRQ 1 */
-    neon250->pci_regs[0x3d] = 0x01; /* Interrupt pin - INTA# */
-    
-    /* AGP specific registers */
-    neon250->pci_regs[0x40] = 0x02; /* AGP 1.0 */
-    neon250->pci_regs[0x41] = 0x00;
-    neon250->pci_regs[0x42] = 0x10; /* AGP Capability */
-    neon250->pci_regs[0x43] = 0x00;
-    
-    neon250->pci_regs[0x44] = 0x03; /* AGP Status */
-    neon250->pci_regs[0x45] = 0x02; /* AGP 1x and 2x */
-    neon250->pci_regs[0x46] = 0x00;
-    neon250->pci_regs[0x47] = 0x1f; /* Maximum 31 requests */
-    
-    /* Power management capability */
-    neon250->pci_regs[0x60] = 0x01; /* Capability ID */
-    neon250->pci_regs[0x61] = 0x40; /* Next capability pointer */
-    neon250->pci_regs[0x62] = 0x21; /* PM capability */
-    neon250->pci_regs[0x63] = 0x06; /* PM control/status */
-    
-    video_inform(VIDEO_FLAG_TYPE_SPECIAL, &timing_neon250);
-    
-    /* Start with common 640x480 VGA mode */
-    neon250->svga.seqregs[0x01] = 0x01; /* 8 dot mode */
-    neon250->svga.seqregs[0x04] = 0x0e; /* Chain 4 */
-
-    neon250->pvr_3d = pvr_3d_init(neon250);
-    
-    return neon250;
-}
-
 static uint8_t neon250_pci_read(int func, int addr, void *priv)
 {
     neon250_t *neon250 = (neon250_t *)priv;
@@ -453,7 +342,7 @@ static void neon250_pci_write(int func, int addr, uint8_t val, void *priv)
     if (addr >= 0 && addr < 256) {
         switch (addr) {
             case PCI_COMMAND:
-                neon250->pci_regs[PCI_COMMAND] = val & 0x07; /* Only bits 0-2 of the command register are writable */
+                neon250->pci_regs[PCI_REG_COMMAND] = val & 0x37; /* Only bits 0-2 of the command register are writable */
                 
                 /* Update memory mapping based on PCI command register */
                 if (val & PCI_COMMAND_MEM) {
@@ -530,6 +419,116 @@ static void neon250_pci_write(int func, int addr, uint8_t val, void *priv)
                 break;
         }
     }
+}
+
+static void *neon250_init(const device_t *info)
+{
+    neon250_t *neon250 = calloc(1, sizeof(neon250_t));
+    
+    neon250->memory_size = device_get_config_int("memory") << 20;
+    
+    /* Set up SVGA */
+    svga_init(info, &neon250->svga, neon250, neon250->memory_size,
+              neon250_recalctimings, neon250_in, neon250_out, NULL, NULL);
+    
+    /* Map the MMIO registers at 0xA05F8000 */
+    mem_mapping_add(&neon250->mmio_mapping, 0xA05F8000, 0x10000,
+                    neon250_mmio_read, neon250_mmio_read_w, neon250_mmio_read_l,
+                    neon250_mmio_write, neon250_mmio_write_w, neon250_mmio_write_l,
+                    NULL, MEM_MAPPING_EXTERNAL, neon250);
+    
+    /* Set up the framebuffer */
+    mem_mapping_set_handler(&neon250->svga.mapping,
+                           svga_read, svga_readw, svga_readl,
+                           svga_write, svga_writew, svga_writel);
+    mem_mapping_set_p(&neon250->svga.mapping, neon250);
+    
+    /* Load the BIOS ROM */
+    rom_init(&neon250->bios_rom, BIOS_ROM_PATH, 0xc0000, 0x20000, 0xffff, 0, MEM_MAPPING_EXTERNAL);
+    
+    /* Set up default display mode */
+    neon250->svga.bpp = 16;
+    neon250->is_interlaced = 0;
+    neon250->is_lowres = 0;
+    
+    /* Set up PCI */
+    neon250->card = pci_add_card(PCI_ADD_AGP, neon250_pci_read, neon250_pci_write, neon250, &neon250->pci_slot);
+    
+    /* Configure PCI registers */
+    neon250->pci_regs[0x00] = PCI_VENDOR_NEC & 0xff;
+    neon250->pci_regs[0x01] = (PCI_VENDOR_NEC >> 8) & 0xff;
+    neon250->pci_regs[0x02] = PCI_DEVICE_NEON250 & 0xff;
+    neon250->pci_regs[0x03] = (PCI_DEVICE_NEON250 >> 8) & 0xff;
+    
+    neon250->pci_regs[0x04] = neon250->pci_regs[0x04] & 0x37;
+    neon250->pci_regs[0x05] = neon250->pci_regs[0x05];
+    
+    neon250->pci_regs[0x06] = 0x90;
+    neon250->pci_regs[0x07] = 0x02;
+    
+    neon250->pci_regs[0x08] = 0x02; /* Revision ID */
+    neon250->pci_regs[0x09] = 0x00; /* Programming interface */
+    
+    neon250->pci_regs[0x0a] = 0x00; /* Subclass - VGA compatible controller */
+    neon250->pci_regs[0x0b] = 0x03; /* Class code - Display controller */
+    
+    neon250->pci_regs[0x0c] = 0x00; /* Cache line size */
+    neon250->pci_regs[0x0d] = 0x20; /* Latency timer - 32 clocks */
+    neon250->pci_regs[0x0e] = 0x00; /* Header type - normal */
+    neon250->pci_regs[0x0f] = 0x00; /* BIST */
+    
+    /* PowerVR uses memory-mapped BARs */
+    neon250->pci_regs[0x10] = 0x08; /* BAR 0 - 64MB aperture for framebuffer, memory mapped */
+    neon250->pci_regs[0x11] = 0x00;
+    neon250->pci_regs[0x12] = 0x00;
+    neon250->pci_regs[0x13] = 0xa0;
+    
+    neon250->pci_regs[0x14] = 0x00; /* BAR 1 - 16KB MMIO registers */
+    neon250->pci_regs[0x15] = 0x80;
+    neon250->pci_regs[0x16] = 0x5f;
+    neon250->pci_regs[0x17] = 0xa0;
+    
+    neon250->pci_regs[0x2c] = 0x00; /* Subsystem vendor ID */
+    neon250->pci_regs[0x2d] = 0x10;
+    neon250->pci_regs[0x2e] = 0x20; /* Subsystem ID */
+    neon250->pci_regs[0x2f] = 0x01;
+    
+    neon250->pci_regs[0x30] = (neon250->pci_regs[0x30] & 0x01);; /* Expansion ROM base address */
+    neon250->pci_regs[0x31] = 0x00;
+    neon250->pci_regs[0x32] = neon250->pci_regs[0x32];
+    neon250->pci_regs[0x33] = neon250->pci_regs[0x33];
+
+    neon250->pci_regs[0x34] = 0x60;
+    
+    neon250->pci_regs[0x3c] = 0x01; /* Interrupt line - IRQ 1 */
+    neon250->pci_regs[0x3d] = 0x01; /* Interrupt pin - INTA# */
+    
+    /* AGP specific registers */
+    neon250->pci_regs[0x40] = 0x02; /* AGP 1.0 */
+    neon250->pci_regs[0x41] = 0x00;
+    neon250->pci_regs[0x42] = 0x10; /* AGP Capability */
+    neon250->pci_regs[0x43] = 0x00;
+    
+    neon250->pci_regs[0x44] = 0x03; /* AGP Status */
+    neon250->pci_regs[0x45] = 0x02; /* AGP 1x and 2x */
+    neon250->pci_regs[0x46] = 0x00;
+    neon250->pci_regs[0x47] = 0x1f; /* Maximum 31 requests */
+    
+    /* Power management capability */
+    neon250->pci_regs[0x60] = 0x01; /* Capability ID */
+    neon250->pci_regs[0x61] = 0x40; /* Next capability pointer */
+    neon250->pci_regs[0x62] = 0x21; /* PM capability */
+    neon250->pci_regs[0x63] = 0x06; /* PM control/status */
+    
+    video_inform(VIDEO_FLAG_TYPE_SPECIAL, &timing_neon250);
+    
+    /* Start with common 640x480 VGA mode */
+    neon250->svga.seqregs[0x01] = 0x01; /* 8 dot mode */
+    neon250->svga.seqregs[0x04] = 0x0e; /* Chain 4 */
+
+    neon250->pvr_3d = pvr_3d_init(neon250);
+    
+    return neon250;
 }
 
 static void neon250_close(void *priv)
